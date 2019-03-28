@@ -1,5 +1,6 @@
 import json
 import sys
+import os
 
 
 def load_data(filepath):
@@ -8,20 +9,50 @@ def load_data(filepath):
         return json_data
 
 
-def conv_to_html(json_data):
-    output_string = ''
-    for block in json_data:
-        for tag, content in block.items():
-                output_string += f'<{tag}>{content}</{tag}>'
-    return output_string
+def convert_list(input_list):
+    converted_output = '<ul>'
+    for element in input_list:
+        if isinstance(element, dict):
+            tmp = convert_dict(element)
+            converted_output += f'<li>{tmp}</li>'
+        elif isinstance(element, str):
+            converted_output += f'<li>{element}</li>'
+    converted_output += '</ul>'
+    return converted_output
+
+
+def convert_dict(child):
+    output = ''
+    for tag, content in child.items():
+        if isinstance(content, list):
+            output += f'<{tag}>' + convert_list(content) + f'</{tag}>'
+        elif isinstance(content, dict):
+            output += f'<{tag}>' + convert_dict(content) + f'</{tag}>'
+        else:
+            output += f'<{tag}>{content}</{tag}>'
+    return output
+
+
+def main_output(json_data):
+    result = ''
+    if isinstance(json_data, list):
+        result += convert_list(json_data)
+    elif isinstance(json_data, dict):
+        result += convert_dict(json_data)
+    return result
+
+
+def critical_error(message):
+    print(message, file=sys.stderr)
+    sys.exit(1)
 
 
 if __name__ == "__main__":
+    filename = sys.argv[1]
     try:
-        json_data = load_data(sys.argv[1])
-
+        json_data = load_data(filename)
     except FileNotFoundError:
-        print('file not found')
+        critical_error('file {} not found'.format(filename))
     except json.JSONDecodeError:
-        print('file must be json')
-    sys.stdout.write(conv_to_html(json_data))
+        critical_error('file must be json')
+    sys.stdout.write(main_output(json_data))
