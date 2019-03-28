@@ -1,6 +1,35 @@
 import json
 import sys
 import os
+import html
+import re
+
+
+class ParsedTag:
+    def __init__(self, extended_tag):
+        a = re.split(r'(\.|#)', extended_tag, maxsplit=1)
+        self.tag = a[0]
+        self.classes = []
+        self.ids = []
+        other = a[1] + a[2] if len(a) == 3 else ''
+        for mo in re.finditer(r'(\.|#)[^.#]+', other):
+            tmp = mo.group()
+            if tmp.startswith('.'):
+                self.classes.append(tmp[1:])
+            else:
+                self.ids.append(tmp[1:])
+
+    def open(self):
+        output = f'<{self.tag}'
+        if self.classes:
+            output += ' class="{}"'.format(' '.join(self.classes))
+        if self.ids:
+            output += ' id="{}"'.format(' '.join(self.ids))
+        output += '>'
+        return output
+
+    def close(self):
+        return f'</{self.tag}>'
 
 
 def load_data(filepath):
@@ -16,7 +45,8 @@ def convert_list(input_list):
             tmp = convert_dict(element)
             converted_output += f'<li>{tmp}</li>'
         elif isinstance(element, str):
-            converted_output += f'<li>{element}</li>'
+            escaped_html = html.escape(element)
+            converted_output += f'<li>{escaped_html}</li>'
     converted_output += '</ul>'
     return converted_output
 
@@ -24,12 +54,14 @@ def convert_list(input_list):
 def convert_dict(child):
     output = ''
     for tag, content in child.items():
+        parsed_tag = ParsedTag(tag)
         if isinstance(content, list):
-            output += f'<{tag}>' + convert_list(content) + f'</{tag}>'
+            output += parsed_tag.open() + convert_list(content) + parsed_tag.close()
         elif isinstance(content, dict):
-            output += f'<{tag}>' + convert_dict(content) + f'</{tag}>'
+            output += parsed_tag.open() + convert_dict(content) + parsed_tag.close()
         else:
-            output += f'<{tag}>{content}</{tag}>'
+            escaped_html = html.escape(content)
+            output += parsed_tag.open() + escaped_html + parsed_tag.close()
     return output
 
 
